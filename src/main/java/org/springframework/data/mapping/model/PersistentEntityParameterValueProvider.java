@@ -42,7 +42,7 @@ public class PersistentEntityParameterValueProvider<P extends PersistentProperty
 	private final @Nullable Object parent;
 
 	public PersistentEntityParameterValueProvider(PersistentEntity<?, P> entity, PropertyValueProvider<P> provider,
-			Object parent) {
+			@Nullable Object parent) {
 		this.entity = entity;
 		this.provider = provider;
 		this.parent = parent;
@@ -53,6 +53,7 @@ public class PersistentEntityParameterValueProvider<P extends PersistentProperty
 		return parameterType.isPrimitive() ? ReflectionUtils.getPrimitiveDefault(parameterType) : null;
 	}
 
+	@Override
 	@Nullable
 	@SuppressWarnings("unchecked")
 	public <T> T getParameterValue(Parameter<T, P> parameter) {

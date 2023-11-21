@@ -287,7 +287,7 @@ class KotlinValueUtils {
 		}
 
 		/**
-		 * @return {@code true} if the value hierarchy applies boxing.
+		 * @return {@literal true} if the value hierarchy applies boxing.
 		 */
 		public boolean appliesBoxing() {
 			return applyBoxing;

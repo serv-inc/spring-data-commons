@@ -135,7 +135,6 @@ public class BasicPersistentEntity<T, P extends PersistentProperty<P>> implement
 
 	@Nullable
 	@Override
-	@SuppressWarnings("unchecked")
 	public PreferredConstructor<T, P> getPersistenceConstructor() {
 		return creator instanceof PreferredConstructor ? (PreferredConstructor<T, P>) creator : null;
 	}
@@ -151,36 +150,89 @@ public class BasicPersistentEntity<T, P extends PersistentProperty<P>> implement
 		return creator != null && creator.isCreatorParameter(property);
 	}
 
+	/**
+	 * Calculates the {@link Alias} to be used for the given type.
+	 *
+	 * @param type must not be {@literal null}.
+	 * @return the alias for {@code type}
+	 */
+	private static Alias getAliasFromAnnotation(Class<?> type) {
+
+		TypeAlias typeAlias = AnnotatedElementUtils.findMergedAnnotation(type, TypeAlias.class);
+
+		if (typeAlias != null && StringUtils.hasText(typeAlias.value())) {
+			return Alias.of(typeAlias.value());
+		}
+
+		return Alias.empty();
+	}
+
+	@Override
 	public boolean isIdProperty(PersistentProperty<?> property) {
 		return idProperty != null && idProperty.equals(property);
 	}
 
+	@Override
 	public boolean isVersionProperty(PersistentProperty<?> property) {
 		return versionProperty != null && versionProperty.equals(property);
 	}
 
+	@Override
 	public String getName() {
 		return getType().getName();
 	}
 
+	@Override
 	@Nullable
 	public P getIdProperty() {
 		return idProperty;
 	}
 
+	@Override
 	@Nullable
 	public P getVersionProperty() {
 		return versionProperty;
 	}
 
+	@Override
 	public boolean hasIdProperty() {
 		return idProperty != null;
 	}
 
+	@Override
 	public boolean hasVersionProperty() {
 		return versionProperty != null;
 	}
 
+	@Override
+	public void setEvaluationContextProvider(EvaluationContextProvider provider) {
+		this.evaluationContextProvider = provider;
+	}
+
+	/**
+	 * Returns the given property if it is a better candidate for the id property than the current id property.
+	 *
+	 * @param property the new id property candidate, will never be {@literal null}.
+	 * @return the given id property or {@literal null} if the given property is not an id property.
+	 */
+	@Nullable
+	protected P returnPropertyIfBetterIdPropertyCandidateOrNull(P property) {
+
+		if (!property.isIdProperty()) {
+			return null;
+		}
+
+		P idProperty = this.idProperty;
+
+		if (idProperty != null) {
+			throw new MappingException(String.format("Attempt to add id property %s but already have property %s registered "
+					+ "as id; Check your mapping configuration ", property.getField(), idProperty.getField()));
+		}
+
+		return property;
+	}
+
+	@Override
 	public void addPersistentProperty(P property) {
 
 		Assert.notNull(property, "Property must not be null");
@@ -231,41 +283,6 @@ public class BasicPersistentEntity<T, P extends PersistentProperty<P>> implement
 	}
 
 	@Override
-	public void setEvaluationContextProvider(EvaluationContextProvider provider) {
-		this.evaluationContextProvider = provider;
-	}
-
-	/**
-	 * Returns the given property if it is a better candidate for the id property than the current id property.
-	 *
-	 * @param property the new id property candidate, will never be {@literal null}.
-	 * @return the given id property or {@literal null} if the given property is not an id property.
-	 */
-	@Nullable
-	protected P returnPropertyIfBetterIdPropertyCandidateOrNull(P property) {
-
-		if (!property.isIdProperty()) {
-			return null;
-		}
-
-		P idProperty = this.idProperty;
-
-		if (idProperty != null) {
-			throw new MappingException(String.format("Attempt to add id property %s but already have property %s registered "
-					+ "as id; Check your mapping configuration ", property.getField(), idProperty.getField()));
-		}
-
-		return property;
-	}
-
-	public void addAssociation(Association<P> association) {
-
-		Assert.notNull(association, "Association must not be null");
-
-		associations.add(association);
-	}
-
-	@Override
 	@Nullable
 	public P getPersistentProperty(String name) {
 		return propertyCache.get(name);
@@ -306,25 +323,27 @@ public class BasicPersistentEntity<T, P extends PersistentProperty<P>> implement
 				.filter(it -> it.isAnnotationPresent(annotationType)).collect(Collectors.toList());
 	}
 
+	@Override
+	public void addAssociation(Association<P> association) {
+
+		Assert.notNull(association, "Association must not be null");
+
+		associations.add(association);
+	}
+
+	@Override
 	public Class<T> getType() {
 		return information.getType();
 	}
 
+	@Override
 	public Alias getTypeAlias() {
 		return typeAlias.get();
 	}
 
+	@Override
 	public TypeInformation<T> getTypeInformation() {
 		return information;
-	}
-
-	public void doWithProperties(PropertyHandler<P> handler) {
-
-		Assert.notNull(handler, "PropertyHandler must not be null");
-
-		for (P property : persistentPropertiesCache) {
-			handler.doWithPersistentProperty(property);
-		}
 	}
 
 	@Override
@@ -337,20 +356,22 @@ public class BasicPersistentEntity<T, P extends PersistentProperty<P>> implement
 		}
 	}
 
+	@Override
+	public void doWithProperties(PropertyHandler<P> handler) {
+
+		Assert.notNull(handler, "PropertyHandler must not be null");
+
+		for (P property : persistentPropertiesCache) {
+			handler.doWithPersistentProperty(property);
+		}
+	}
+
+	@Override
 	public void doWithAssociations(AssociationHandler<P> handler) {
 
 		Assert.notNull(handler, "Handler must not be null");
 
 		for (Association<P> association : associations) {
-			handler.doWithAssociation(association);
-		}
-	}
-
-	public void doWithAssociations(SimpleAssociationHandler handler) {
-
-		Assert.notNull(handler, "Handler must not be null");
-
-		for (Association<? extends PersistentProperty<?>> association : associations) {
 			handler.doWithAssociation(association);
 		}
 	}
@@ -373,11 +394,13 @@ public class BasicPersistentEntity<T, P extends PersistentProperty<P>> implement
 				it -> Optional.ofNullable(AnnotatedElementUtils.findMergedAnnotation(getType(), it)));
 	}
 
-	public void verify() {
+	@Override
+	public void doWithAssociations(SimpleAssociationHandler handler) {
 
-		if (comparator != null) {
-			properties.sort(comparator);
-			persistentPropertiesCache.sort(comparator);
+		Assert.notNull(handler, "Handler must not be null");
+
+		for (Association<? extends PersistentProperty<?>> association : associations) {
+			handler.doWithAssociation(association);
 		}
 	}
 
@@ -471,16 +494,13 @@ public class BasicPersistentEntity<T, P extends PersistentProperty<P>> implement
 		return evaluationContextProvider.getEvaluationContext(rootObject, dependencies);
 	}
 
-	/**
-	 * Returns the default {@link IsNewStrategy} to be used. Will be a {@link PersistentEntityIsNewStrategy} by default.
-	 * Note, that this strategy only gets used if the entity doesn't implement {@link Persistable} as this indicates the
-	 * user wants to be in control over whether an entity is new or not.
-	 *
-	 * @return
-	 * @since 2.1
-	 */
-	protected IsNewStrategy getFallbackIsNewStrategy() {
-		return PersistentEntityIsNewStrategy.of(this);
+	@Override
+	public void verify() {
+
+		if (comparator != null) {
+			properties.sort(comparator);
+			persistentPropertiesCache.sort(comparator);
+		}
 	}
 
 	/**
@@ -496,20 +516,15 @@ public class BasicPersistentEntity<T, P extends PersistentProperty<P>> implement
 	}
 
 	/**
-	 * Calculates the {@link Alias} to be used for the given type.
+	 * Returns the default {@link IsNewStrategy} to be used. Will be a {@link PersistentEntityIsNewStrategy} by default.
+	 * Note, that this strategy only gets used if the entity doesn't implement {@link Persistable} as this indicates the
+	 * user wants to be in control over whether an entity is new or not.
 	 *
-	 * @param type must not be {@literal null}.
-	 * @return
+	 * @return the fallback {@link IsNewStrategy}.
+	 * @since 2.1
 	 */
-	private static Alias getAliasFromAnnotation(Class<?> type) {
-
-		TypeAlias typeAlias = AnnotatedElementUtils.findMergedAnnotation(type, TypeAlias.class);
-
-		if (typeAlias != null && StringUtils.hasText(typeAlias.value())) {
-			return Alias.of(typeAlias.value());
-		}
-
-		return Alias.empty();
+	protected IsNewStrategy getFallbackIsNewStrategy() {
+		return PersistentEntityIsNewStrategy.of(this);
 	}
 
 	/**
@@ -546,6 +561,7 @@ public class BasicPersistentEntity<T, P extends PersistentProperty<P>> implement
 			this.delegate = delegate;
 		}
 
+		@Override
 		public int compare(@Nullable Association<P> left, @Nullable Association<P> right) {
 
 			if (left == null) {
