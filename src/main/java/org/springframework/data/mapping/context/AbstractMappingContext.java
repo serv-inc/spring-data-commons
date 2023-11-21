@@ -33,7 +33,6 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.InitializingBean;
@@ -562,10 +561,6 @@ public abstract class AbstractMappingContext<E extends MutablePersistentEntity<?
 		private void createAndRegisterProperty(Property input) {
 
 			P property = createPersistentProperty(input, entity, simpleTypeHolder);
-
-			if (property.isTransient()) {
-				return;
-			}
 
 			if (!input.isFieldBacked() && !property.usePropertyAccess()) {
 				return;

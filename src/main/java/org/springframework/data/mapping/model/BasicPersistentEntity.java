@@ -67,11 +67,14 @@ public class BasicPersistentEntity<T, P extends PersistentProperty<P>> implement
 	private final @Nullable InstanceCreatorMetadata<P> creator;
 	private final TypeInformation<T> information;
 	private final List<P> properties;
+	private final List<P> transientProperties;
 	private final List<P> persistentPropertiesCache;
 	private final @Nullable Comparator<P> comparator;
 	private final Set<Association<P>> associations;
 
 	private final Map<String, P> propertyCache;
+
+	private final Map<String, P> transientPropertyCache;
 	private final Map<Class<? extends Annotation>, Optional<Annotation>> annotationCache;
 	private final MultiValueMap<Class<? extends Annotation>, P> propertyAnnotationCache;
 
@@ -108,12 +111,14 @@ public class BasicPersistentEntity<T, P extends PersistentProperty<P>> implement
 
 		this.information = information;
 		this.properties = new ArrayList<>();
+		this.transientProperties = new ArrayList<>(0);
 		this.persistentPropertiesCache = new ArrayList<>();
 		this.comparator = comparator;
 		this.creator = InstanceCreatorMetadataDiscoverer.discover(this);
 		this.associations = comparator == null ? new HashSet<>() : new TreeSet<>(new AssociationComparator<>(comparator));
 
 		this.propertyCache = new HashMap<>(16, 1f);
+		this.transientPropertyCache = new HashMap<>(0, 1f);
 		this.annotationCache = new ConcurrentReferenceHashMap<>(16, ReferenceType.WEAK);
 		this.propertyAnnotationCache = CollectionUtils
 				.toMultiValueMap(new ConcurrentReferenceHashMap<>(16, ReferenceType.WEAK));
@@ -180,6 +185,18 @@ public class BasicPersistentEntity<T, P extends PersistentProperty<P>> implement
 
 		Assert.notNull(property, "Property must not be null");
 
+		if (property.isTransient()) {
+
+			if (transientProperties.contains(property)) {
+				return;
+			}
+
+			transientProperties.add(property);
+			transientPropertyCache.put(property.getName(), property);
+
+			return;
+		}
+
 		if (properties.contains(property)) {
 			return;
 		}
@@ -205,10 +222,8 @@ public class BasicPersistentEntity<T, P extends PersistentProperty<P>> implement
 			if (versionProperty != null) {
 
 				throw new MappingException(
-						String.format(
-								"Attempt to add version property %s but already have property %s registered "
-										+ "as version; Check your mapping configuration",
-								property.getField(), versionProperty.getField()));
+						String.format("Attempt to add version property %s but already have property %s registered "
+								+ "as version; Check your mapping configuration", property.getField(), versionProperty.getField()));
 			}
 
 			this.versionProperty = property;
@@ -254,6 +269,19 @@ public class BasicPersistentEntity<T, P extends PersistentProperty<P>> implement
 	@Nullable
 	public P getPersistentProperty(String name) {
 		return propertyCache.get(name);
+	}
+
+	@Override
+	public P getTransientProperty(String name) {
+		return transientPropertyCache.get(name);
+	}
+
+	@Override
+	public boolean isTransient(String property) {
+
+		P transientProperty = getTransientProperty(property);
+
+		return transientProperty != null && transientProperty.isTransient();
 	}
 
 	@Override
