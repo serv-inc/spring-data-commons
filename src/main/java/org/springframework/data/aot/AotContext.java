@@ -28,6 +28,7 @@ import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.BeanReference;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.RootBeanDefinition;
+import org.springframework.core.SpringProperties;
 import org.springframework.data.util.TypeScanner;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
@@ -47,6 +48,12 @@ import org.springframework.util.Assert;
  * @since 3.0
  */
 public interface AotContext {
+
+	String GENERATED_REPOSITORIES_ENABLED = "spring.aot.repositories.enabled";
+
+	static boolean aotGeneratedRepositoriesEnabled() {
+		return SpringProperties.getFlag(GENERATED_REPOSITORIES_ENABLED);
+	}
 
 	/**
 	 * Create an {@link AotContext} backed by the given {@link BeanFactory}.
